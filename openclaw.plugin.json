@@ -4,5 +4,10 @@
   "version": "0.1.0",
   "description": "Read and edit Jupyter notebooks (.ipynb)",
   "capabilities": ["tools"],
-  "skills": ["./src/skills/notebook-tools"]
+  "skills": ["./src/skills/notebook-tools"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
 }

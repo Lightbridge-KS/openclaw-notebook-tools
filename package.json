@@ -12,7 +12,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist *.tgz",
+    "pack:plugin": "pnpm build && npm pack"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.32.0",
