@@ -1,4 +1,4 @@
-# @kittipos/openclaw-notebook-tools
+# Openclaw Notebook Tools
 
 OpenClaw plugin: read and edit Jupyter notebooks (`.ipynb`) with structured,
 cell-aware tools instead of raw nbformat JSON.
@@ -19,7 +19,6 @@ by a per-tool opt-in.
 | `notebook_delete_cell`    | Yes         | Delete a cell by id or index                 |
 | `notebook_clear_outputs`  | Yes         | Clear outputs (all or single cell)           |
 
-See `docs/Notebook-Tools-Spec.md` for the full behavioral contract.
 
 ## Why?
 
@@ -78,5 +77,3 @@ The codebase follows Clean Architecture:
 - `src/nb/` — pure notebook domain (no SDK imports), unit-testable in isolation.
 - `src/tools/` — adapter layer: TypeBox schemas, error mapping, tool registration.
 - `index.ts` — composition only, wires tools into `definePluginEntry`.
-
-See `CLAUDE.md` (a.k.a. `AGENTS.md`) for implementation conventions.
