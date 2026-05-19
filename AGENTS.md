@@ -4,7 +4,7 @@
 
 ## Stack
 
-Node ≥ 22, TypeScript strict ESM, `@sinclair/typebox`, `nanoid`, Vitest. `openclaw` is a peer dep. No `@jupyterlab/nbformat` — types are hand-rolled in `src/nb/types.ts`.
+Node ≥ 22, TypeScript strict ESM, `typebox`, `nanoid`, Vitest. `openclaw` is a peer dep. No `@jupyterlab/nbformat` — types are hand-rolled in `src/nb/types.ts`.
 
 ## Architecture (non-negotiable)
 
@@ -18,22 +18,24 @@ src/nb/*.ts     →  pure domain (no SDK imports, throws typed errors)
 2. **`src/tools/` is the only layer that knows the SDK.** Each `execute()` body wraps domain calls in `try/catch` and **re-throws typed `NotebookError`s**. The SDK converts thrown errors into structured tool error results.
 3. **`index.ts` is composition only.**
 
-## SDK contract (verified against `openclaw@2026.4.23`)
+## SDK contract (verified against `openclaw@2026.5.18`)
 
-- Import from **`openclaw/plugin-sdk/core`** — re-exports `definePluginEntry`, `OpenClawPluginApi`, `jsonResult`, `readStringParam`, etc. (Built-in extensions like `firecrawl` import from here.) Avoid `openclaw/plugin-sdk` (deprecated monolithic root).
+- Runtime entry imports **`defineToolPlugin` from `openclaw/plugin-sdk/tool-plugin`**. Use `definePluginEntry` only if the plugin needs mixed/dynamic runtime surfaces.
+- Tool adapters may still import `OpenClawPluginApi` and `AnyAgentTool` from **`openclaw/plugin-sdk/core`** when wrapping the existing `api.registerTool(...)` functions.
+- Import TypeBox schemas from **`typebox`**, not `@sinclair/typebox`. Current OpenClaw tool-plugin metadata generation expects `typebox`.
 - `AgentTool { label: string }` — `label` is **required**. Don't omit it.
 - `AgentToolResult = { content, details, terminate? }` — there is **no `isError` field**. Throw on failure; the SDK wraps the thrown error.
 - `execute(toolCallId, params, signal?, onUpdate?)`. Use `executionMode: "sequential"` on mutating tools.
-- **`configSchema` is required in `openclaw.plugin.json`** (the manifest), not in code. The manifest field is validated at config write time, *before plugin code loads*. Per the docs: "Every plugin must ship a JSON Schema, even if it accepts no config." For a tool plugin with no user config, use:
+- `defineToolPlugin` supplies an empty strict `configSchema` when none is provided, and `openclaw plugins build` writes it into `openclaw.plugin.json`. For a tool plugin with no user config, the generated manifest schema should be:
   ```json
   "configSchema": { "type": "object", "additionalProperties": false, "properties": {} }
   ```
-  The `definePluginEntry({ configSchema })` field in code defaults to `emptyPluginConfigSchema` when omitted, so don't pass it — the manifest is the single source of truth. Without the manifest field, install fails with: *"plugin manifest requires configSchema"*.
+- Run `pnpm plugin:build` after changing plugin id, name, description, activation, config schema, or tool names so `openclaw.plugin.json`, `contracts.tools`, and `package.json` stay aligned.
 
 ## Tool skeleton
 
 ```ts
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { loadNotebook } from "../nb/load.js";
 import { saveNotebook } from "../nb/save.js";
@@ -101,9 +103,12 @@ pnpm install
 pnpm typecheck     # tsc --noEmit
 pnpm test --run    # vitest single run
 pnpm build         # tsc → dist/
+pnpm plugin:build  # build + regenerate openclaw.plugin.json/package metadata
+pnpm plugin:check  # CI-style stale metadata check
+pnpm plugin:validate
 
 # Install into OpenClaw — ALWAYS via the packed tarball, never the source dir.
-pnpm pack:plugin           # build + `npm pack` → *.tgz
+pnpm pack:plugin           # plugin:build + `npm pack` → *.tgz
 openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0.tgz
 openclaw plugins list      # confirm `notebook-tools` is listed
 openclaw gateway restart
@@ -120,7 +125,7 @@ whitelist.
 
 - **Plugin not loading?** Check `openclaw plugins list` and gateway logs. Usual cause: missing `.js` extensions on imports, or `package.json` missing `"type": "module"`.
 - **Mutating tool not appearing?** It needs a `tools.allow` entry in `~/.openclaw/openclaw.json` (see README).
-- **SDK type errors?** You're importing from the deprecated root. Use `openclaw/plugin-sdk/core`.
+- **SDK type errors?** Keep the runtime entry on `openclaw/plugin-sdk/tool-plugin`; keep tool adapter API types on `openclaw/plugin-sdk/core`.
 - **Notebook corruption?** The atomic save is broken. Check `src/nb/save.ts` first.
 
 ## Where to look

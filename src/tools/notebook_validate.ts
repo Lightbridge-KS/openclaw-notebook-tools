@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 
 import { NotebookError, NotebookNotFoundError } from "../nb/errors.js";

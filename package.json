@@ -5,19 +5,33 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "openclaw.plugin.json", "src/skills"],
-  "openclaw": { "extensions": ["./dist/index.js"] },
-  "engines": { "node": ">=22" },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md",
+    "src/skills"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "clean": "rm -rf dist *.tgz",
-    "pack:plugin": "pnpm build && npm pack"
+    "plugin:build": "pnpm build && openclaw plugins build --entry ./dist/index.js",
+    "plugin:check": "pnpm build && openclaw plugins build --entry ./dist/index.js --check",
+    "plugin:validate": "openclaw plugins validate --entry ./dist/index.js",
+    "pack:plugin": "pnpm plugin:build && npm pack"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.32.0",
-    "nanoid": "^5.0.0"
+    "nanoid": "^5.0.0",
+    "typebox": "^1.1.38"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -25,6 +39,11 @@
     "vitest": "^1.6.0"
   },
   "peerDependencies": {
-    "openclaw": "*"
+    "openclaw": ">=2026.5.17"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
   }
 }

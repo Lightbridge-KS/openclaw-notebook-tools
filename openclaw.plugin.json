@@ -6,11 +6,28 @@
   "activation": {
     "onStartup": true
   },
-  "capabilities": ["tools"],
-  "skills": ["./src/skills/notebook-tools"],
+  "capabilities": [
+    "tools"
+  ],
+  "skills": [
+    "./src/skills/notebook-tools"
+  ],
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
-    "properties": {}
+    "properties": {},
+    "additionalProperties": false
+  },
+  "contracts": {
+    "tools": [
+      "notebook_create",
+      "notebook_read",
+      "notebook_list_cells",
+      "notebook_search",
+      "notebook_edit_cell",
+      "notebook_insert_cell",
+      "notebook_delete_cell",
+      "notebook_clear_outputs",
+      "notebook_validate"
+    ]
   }
 }

@@ -1,7 +1,7 @@
 import { access, mkdir, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 
 import {

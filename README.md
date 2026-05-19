@@ -42,7 +42,7 @@ first?" below):
 
 ```bash
 pnpm install
-pnpm pack:plugin                   # builds dist/ and runs `npm pack`
+pnpm pack:plugin                   # builds, refreshes plugin metadata, then runs `npm pack`
                                    # → kittipos-openclaw-notebook-tools-0.1.0.tgz
 
 openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0.tgz
@@ -58,10 +58,10 @@ pnpm-managed dev tree, that copies hundreds of MB of symlinked
 `node_modules` and breaks the install.
 
 `npm pack` respects the `files` whitelist in `package.json`, producing a
-~30 kB tarball with only `dist/`, `openclaw.plugin.json`, `package.json`, and
-`src/skills/`. OpenClaw extracts the tarball into a clean staging directory
-and runs `npm install` against just our two runtime deps (`@sinclair/typebox`,
-`nanoid`).
+~30 kB tarball with only `dist/`, `openclaw.plugin.json`, `README.md`,
+`package.json`, and `src/skills/`. OpenClaw extracts the tarball into a clean
+staging directory and runs `npm install` against just our two runtime deps
+(`typebox`, `nanoid`).
 
 ## Develop
 
@@ -70,10 +70,13 @@ pnpm test         # vitest watch mode
 pnpm test --run   # single run (CI mode)
 pnpm typecheck    # tsc --noEmit
 pnpm build        # tsc → dist/
+pnpm plugin:build # build + regenerate OpenClaw plugin metadata
+pnpm plugin:check # build + fail if generated metadata is stale
+pnpm plugin:validate
 ```
 
 The codebase follows Clean Architecture:
 
 - `src/nb/` — pure notebook domain (no SDK imports), unit-testable in isolation.
 - `src/tools/` — adapter layer: TypeBox schemas, error mapping, tool registration.
-- `index.ts` — composition only, wires tools into `definePluginEntry`.
+- `index.ts` — composition only, wires tools into `defineToolPlugin`.
