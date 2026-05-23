@@ -355,7 +355,7 @@ jobs:
           fi
           printf '//registry.npmjs.org/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
           npm whoami >/dev/null
-          npm publish "${{ steps.tarball.outputs.path }}" --access public --tag "$NPM_DIST_TAG" --provenance
+          npm publish "./${{ steps.tarball.outputs.path }}" --access public --tag "$NPM_DIST_TAG" --provenance
 
       - name: Build release notes
         env:
