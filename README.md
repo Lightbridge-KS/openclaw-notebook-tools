@@ -1,4 +1,6 @@
-# Openclaw Notebook Tools
+# OpenClaw Notebook Tools
+
+> **Cell-aware Jupyter notebook editing for OpenClaw agents, without raw JSON surgery.**
 
 OpenClaw plugin: read and edit Jupyter notebooks (`.ipynb`) with structured,
 cell-aware tools instead of raw nbformat JSON.
@@ -35,17 +37,44 @@ token-hungry, and easy to corrupt. This plugin provides a cell-aware API with:
 - **Output-aware truncation** so reading a notebook full of large outputs
   doesn't blow your token budget.
 
+## Safety model
+
+This plugin intentionally exposes all nine tools as always-on once installed.
+That keeps notebook work ergonomic for agents: they can inspect, edit, clean,
+and validate notebooks without a second allowlist step.
+
+The trust boundary is implemented in the tool behavior instead:
+
+- Mutating tools use sequential execution so concurrent tool calls do not race.
+- Writes are atomic: save to a sibling temp file, fsync, then rename.
+- Mutations validate notebook structure before replacing the original file.
+- Stale guards (`expected_source_sha256`, `expected_file_mtime_ms`) prevent
+  silent overwrites when a notebook changed after the agent inspected it.
+- Editing a code cell clears its outputs and execution count, avoiding stale
+  result displays.
+- The plugin never executes notebook code. It only reads and edits files.
+- Agents should run `notebook_validate` after mutations before reporting
+  success.
+
 ## Install
 
-Install from a packed tarball (not from the source directory — see "Why pack
+Install from ClawHub:
+
+```bash
+openclaw plugins install clawhub:@kittipos/openclaw-notebook-tools
+openclaw plugins list
+openclaw gateway restart
+```
+
+For local development, install from a packed tarball (not from the source directory — see "Why pack
 first?" below):
 
 ```bash
 pnpm install
 pnpm pack:plugin                   # builds, refreshes plugin metadata, then runs `npm pack`
-                                   # → kittipos-openclaw-notebook-tools-0.1.0.tgz
+                                   # → kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
 
-openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0.tgz
+openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
 openclaw plugins list              # confirm `notebook-tools` is listed
 openclaw gateway restart
 ```
@@ -57,22 +86,24 @@ openclaw gateway restart
 pnpm-managed dev tree, that copies hundreds of MB of symlinked
 `node_modules` and breaks the install.
 
-`npm pack` respects the `files` whitelist in `package.json`, producing a
-~30 kB tarball with only `dist/`, `openclaw.plugin.json`, `README.md`,
-`package.json`, and `src/skills/`. OpenClaw extracts the tarball into a clean
-staging directory and runs `npm install` against just our two runtime deps
-(`typebox`, `nanoid`).
+`npm pack` respects the `files` whitelist in `package.json`, producing a small
+tarball with runtime JS, the plugin manifest, public docs, and the shipped
+skill. OpenClaw extracts the tarball into a clean staging directory and runs
+`npm install` against just our runtime deps (`typebox`, `nanoid`).
 
 ## Develop
 
 ```bash
+pnpm install
 pnpm test         # vitest watch mode
-pnpm test --run   # single run (CI mode)
+pnpm test:run   # single run (CI mode)
 pnpm typecheck    # tsc --noEmit
 pnpm build        # tsc → dist/
 pnpm plugin:build # build + regenerate OpenClaw plugin metadata
 pnpm plugin:check # build + fail if generated metadata is stale
 pnpm plugin:validate
+npm pack --dry-run --json
+clawhub package publish "$(pwd)" --owner kittipos --version 0.1.0-beta.1 --dry-run --json
 ```
 
 The codebase follows Clean Architecture:

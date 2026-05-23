@@ -1,8 +1,7 @@
 # Bot UX Review: `notebook-tools` vs native OpenClaw + `nbformat`
 
-_Date: 2026-04-26_  
-_Reviewer: Bernard, from live OpenClaw tool use_  
-_Test notebooks: `~/my_agents/notebook-tests/`
+_Date: 2026-04-26_
+_Reviewer: Bernard, from live OpenClaw tool use_
 
 ## Executive summary
 
@@ -117,16 +116,20 @@ When editing a code cell, the plugin clears outputs and resets `execution_count`
 
 Native `nbformat` does not stop you from changing source while leaving old outputs attached. The bot has to remember that invariant manually. This is exactly the kind of quiet notebook footgun a dedicated tool should remove.
 
-### 5. Opt-in mutating tools feel right
+### 5. Always-on tools keep the workflow smooth
 
-In this installed setup, mutating tools were available after explicit opt-in. That is a good trust boundary.
+The current package exposes all nine tools after install, including mutation
+tools. That is a deliberate convenience choice: the agent can move from
+inspection to safe edit to validation without a second configuration step.
 
-Read-only notebook tools feel safe to expose broadly. Editing tools are more powerful: they alter user files. Having them opt-in makes the plugin safer while preserving the smooth UX once enabled.
+Editing tools are still powerful because they alter user files, so the trust
+boundary lives in behavior rather than discovery:
 
 From the bot side, the distinction is clear:
 
 - discovery tools: use freely
-- mutation tools: use when the user asked for notebook changes, then validate
+- mutation tools: use only when the user asked for notebook changes, use stale
+  guards when available, then validate
 
 ### 6. The native path is still valuable for plugin debugging
 
@@ -188,20 +191,22 @@ Use native `nbformat` only when the task is outside the plugin's current operati
 
 These are not blockers; the current tool surface is already useful.
 
-1. **Return inserted cell source hash from `notebook_insert_cell`.**  
+1. **Return inserted cell source hash from `notebook_insert_cell`.**
    The tool reports the new id, which is essential. Returning `source_sha256` too would make immediate guarded follow-up edits/deletes smoother without an extra `notebook_read`.
 
-2. **Consider a compound operation tool later.**  
+2. **Consider a compound operation tool later.**
    Something like `notebook_apply_ops` could batch multiple safe edits with one validation and one atomic save. This would be useful for larger refactors while preserving structured guardrails.
 
-3. **Expose a dry-run/diff mode for mutations.**  
+3. **Expose a dry-run/diff mode for mutations.**
    A preview mode showing cell-level before/after would be excellent for sensitive notebooks.
 
-4. **Keep mutation tools opt-in.**  
-   The UX still feels smooth after opt-in, and the trust boundary is worth it.
+4. **Keep mutation safety visible.**
+   README and skill guidance should make clear that all tools are always-on,
+   while writes remain atomic, guarded, and validation-oriented.
 
-5. **Document the installed opt-in behavior prominently.**  
-   The docs should make it obvious which tools are read-only by default and which require explicit enabling in the local OpenClaw configuration.
+5. **Document the always-on behavior prominently.**
+   Users should understand that install means both read and edit tools become
+   available, and that the plugin never executes notebook code.
 
 ## Bottom line
 

@@ -1,28 +1,62 @@
 {
   "name": "@kittipos/openclaw-notebook-tools",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "OpenClaw plugin: read and edit Jupyter notebooks",
+  "keywords": [
+    "ai-agent",
+    "ipynb",
+    "jupyter",
+    "notebook",
+    "openclaw",
+    "plugin"
+  ],
+  "homepage": "https://github.com/Lightbridge-KS/openclaw-notebook-tools#readme",
+  "bugs": {
+    "url": "https://github.com/Lightbridge-KS/openclaw-notebook-tools/issues"
+  },
+  "license": "MIT",
+  "author": "Kittipos Sirivongrungson",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lightbridge-KS/openclaw-notebook-tools.git"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "docs",
     "openclaw.plugin.json",
     "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "VISION.md",
     "src/skills"
   ],
+  "packageManager": "pnpm@9.15.9",
   "openclaw": {
     "extensions": [
       "./dist/index.js"
-    ]
+    ],
+    "compat": {
+      "pluginApi": ">=2026.5.17",
+      "minGatewayVersion": "2026.5.17"
+    },
+    "build": {
+      "openclawVersion": "2026.5.20",
+      "pluginSdkVersion": "2026.5.20"
+    }
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "test:run": "vitest --run",
     "clean": "rm -rf dist *.tgz",
     "plugin:build": "pnpm build && openclaw plugins build --entry ./dist/index.js",
     "plugin:check": "pnpm build && openclaw plugins build --entry ./dist/index.js --check",
@@ -35,6 +69,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "openclaw": "2026.5.20",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   },

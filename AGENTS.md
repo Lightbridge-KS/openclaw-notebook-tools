@@ -4,7 +4,7 @@
 
 ## Stack
 
-Node ≥ 22, TypeScript strict ESM, `typebox`, `nanoid`, Vitest. `openclaw` is a peer dep. No `@jupyterlab/nbformat` — types are hand-rolled in `src/nb/types.ts`.
+Node ≥ 22.19, TypeScript strict ESM, `typebox`, `nanoid`, Vitest. `openclaw` is a dev dependency for build/validation and a peer dependency at runtime. No `@jupyterlab/nbformat` — types are hand-rolled in `src/nb/types.ts`.
 
 ## Architecture (non-negotiable)
 
@@ -18,7 +18,7 @@ src/nb/*.ts     →  pure domain (no SDK imports, throws typed errors)
 2. **`src/tools/` is the only layer that knows the SDK.** Each `execute()` body wraps domain calls in `try/catch` and **re-throws typed `NotebookError`s**. The SDK converts thrown errors into structured tool error results.
 3. **`index.ts` is composition only.**
 
-## SDK contract (verified against `openclaw@2026.5.18`)
+## SDK contract (verified against `openclaw@2026.5.20`)
 
 - Runtime entry imports **`defineToolPlugin` from `openclaw/plugin-sdk/tool-plugin`**. Use `definePluginEntry` only if the plugin needs mixed/dynamic runtime surfaces.
 - Tool adapters may still import `OpenClawPluginApi` and `AnyAgentTool` from **`openclaw/plugin-sdk/core`** when wrapping the existing `api.registerTool(...)` functions.
@@ -66,7 +66,6 @@ export function registerNotebookEditCell(api: OpenClawPluginApi): void {
         }
       },
     },
-    { optional: true }, // mutating → opt-in; omit for read-only tools
   );
 }
 ```
@@ -94,14 +93,14 @@ export function registerNotebookEditCell(api: OpenClawPluginApi): void {
 - Mirror `src/` under `tests/`. One file per source module.
 - Each tool: 1 happy + 2 error paths.
 - Atomic-save guard: target a directory at `dest` to force a real rename failure (don't try to `vi.spyOn` `fs/promises` — fails under NodeNext ESM).
-- Run: `pnpm test --run`.
+- Run: `pnpm test:run`.
 
 ## Commands
 
 ```bash
 pnpm install
 pnpm typecheck     # tsc --noEmit
-pnpm test --run    # vitest single run
+pnpm test:run    # vitest single run
 pnpm build         # tsc → dist/
 pnpm plugin:build  # build + regenerate openclaw.plugin.json/package metadata
 pnpm plugin:check  # CI-style stale metadata check
@@ -109,7 +108,7 @@ pnpm plugin:validate
 
 # Install into OpenClaw — ALWAYS via the packed tarball, never the source dir.
 pnpm pack:plugin           # plugin:build + `npm pack` → *.tgz
-openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0.tgz
+openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
 openclaw plugins list      # confirm `notebook-tools` is listed
 openclaw gateway restart
 ```
@@ -124,7 +123,7 @@ whitelist.
 ## When stuck
 
 - **Plugin not loading?** Check `openclaw plugins list` and gateway logs. Usual cause: missing `.js` extensions on imports, or `package.json` missing `"type": "module"`.
-- **Mutating tool not appearing?** It needs a `tools.allow` entry in `~/.openclaw/openclaw.json` (see README).
+- **Tool missing from discovery?** Run `pnpm plugin:build` and check that `openclaw.plugin.json` has every tool in `contracts.tools`.
 - **SDK type errors?** Keep the runtime entry on `openclaw/plugin-sdk/tool-plugin`; keep tool adapter API types on `openclaw/plugin-sdk/core`.
 - **Notebook corruption?** The atomic save is broken. Check `src/nb/save.ts` first.
 

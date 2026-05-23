@@ -1,0 +1,431 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish, for example v0.1.0 or v0.1.0-beta.1
+        required: true
+        type: string
+      preflight_only:
+        description: Run validation/build only and skip publish
+        required: true
+        default: true
+        type: boolean
+      preflight_run_id:
+        description: Successful preflight run id to promote
+        required: false
+        type: string
+      npm_dist_tag:
+        description: npm dist-tag
+        required: true
+        default: latest
+        type: choice
+        options:
+          - beta
+          - latest
+      publish_clawhub:
+        description: Publish to ClawHub after npm and draft GitHub Release
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: notebook-tools-release-${{ inputs.tag }}-${{ inputs.npm_dist_tag }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22.19.0"
+  PNPM_VERSION: "9.15.9"
+  CLAWHUB_VERSION: "0.17.0"
+  PACKAGE_NAME: "@kittipos/openclaw-notebook-tools"
+  CLAWHUB_OWNER: "kittipos"
+
+jobs:
+  preflight:
+    if: ${{ inputs.preflight_only }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate inputs
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+          PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_TAG" == *"-beta."* && "$NPM_DIST_TAG" != "beta" ]]; then
+            echo "Prerelease tags must use npm_dist_tag=beta." >&2
+            exit 1
+          fi
+          if [[ -n "$PREFLIGHT_RUN_ID" ]]; then
+            echo "preflight_run_id is only valid for publish runs." >&2
+            exit 1
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Print tool versions
+        run: |
+          set -euo pipefail
+          node --version
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate package metadata
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          EXPECTED_PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          expected_version="${RELEASE_TAG#v}"
+          if [[ "$package_name" != "$EXPECTED_PACKAGE_NAME" ]]; then
+            echo "Unexpected package name: $package_name" >&2
+            exit 1
+          fi
+          if [[ "$package_version" != "$expected_version" ]]; then
+            echo "package.json version $package_version does not match $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Validate changelog
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.RELEASE_TAG.replace(/^v/, "");
+          const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+          const lines = changelog.split(/\r?\n/);
+          const heading = `## ${version}`;
+          const start = lines.findIndex((line) => line.trim() === heading);
+          if (start === -1) {
+            console.error(`CHANGELOG.md is missing ${heading}`);
+            process.exit(1);
+          }
+          const section = [];
+          for (const line of lines.slice(start + 1)) {
+            if (line.trim().startsWith("## ")) break;
+            section.push(line);
+          }
+          const hasBullet = section.some((line) => {
+            const trimmed = line.trim();
+            return trimmed.startsWith("- ");
+          });
+          if (!hasBullet) {
+            console.error(`${heading} must contain at least one bullet.`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Ensure npm version is not already published
+        env:
+          PREFLIGHT_ONLY: ${{ inputs.preflight_only }}
+        run: |
+          set -euo pipefail
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "${package_name}@${package_version} is already published on npm; continuing preflight only."
+          fi
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test:run
+
+      - name: Check plugin metadata
+        run: pnpm plugin:check
+
+      - name: Validate plugin
+        run: pnpm plugin:validate
+
+      - name: Install ClawHub CLI
+        run: npm install -g "clawhub@${CLAWHUB_VERSION}"
+
+      - name: ClawHub dry run
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+          CLAWHUB_OWNER: ${{ env.CLAWHUB_OWNER }}
+        run: |
+          set -euo pipefail
+          package_version="${RELEASE_TAG#v}"
+          release_sha="$(git rev-parse HEAD)"
+          clawhub package publish "$(pwd)" \
+            --family code-plugin \
+            --owner "$CLAWHUB_OWNER" \
+            --version "$package_version" \
+            --tags "$RELEASE_NPM_DIST_TAG" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$release_sha" \
+            --source-ref "$RELEASE_TAG" \
+            --clawscan-note "OpenClaw tool plugin for local Jupyter notebook file reads and atomic edits. It does not execute notebook code or contact external services." \
+            --dry-run \
+            --json
+
+      - name: Pack release tarball
+        id: pack
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          pack_json="$(npm pack --json)"
+          printf '%s\n' "$pack_json"
+          tarball="$(printf '%s\n' "$pack_json" | node -e 'const fs = require("node:fs"); const data = JSON.parse(fs.readFileSync(0, "utf8")); process.stdout.write(data[0].filename);')"
+          artifact_dir="$RUNNER_TEMP/notebook-tools-release"
+          rm -rf "$artifact_dir"
+          mkdir -p "$artifact_dir"
+          cp "$tarball" "$artifact_dir/"
+          (cd "$artifact_dir" && shasum -a 256 "$tarball" > "${tarball}.sha256")
+          release_sha="$(git rev-parse HEAD)"
+          printf '%s\n' "$(node -p "require('./package.json').name")" > "$artifact_dir/package-name.txt"
+          printf '%s\n' "$(node -p "require('./package.json').version")" > "$artifact_dir/package-version.txt"
+          printf '%s\n' "$RELEASE_TAG" > "$artifact_dir/release-tag.txt"
+          printf '%s\n' "$release_sha" > "$artifact_dir/release-sha.txt"
+          printf '%s\n' "$NPM_DIST_TAG" > "$artifact_dir/npm-dist-tag.txt"
+          echo "dir=$artifact_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release preflight artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-tools-release-${{ inputs.tag }}
+          path: ${{ steps.pack.outputs.dir }}
+          if-no-files-found: error
+
+  validate_publish_request:
+    if: ${{ !inputs.preflight_only }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require main workflow ref and preflight artifact
+        env:
+          WORKFLOW_REF: ${{ github.ref }}
+          PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "$WORKFLOW_REF" != "refs/heads/main" ]]; then
+            echo "Publish runs must be dispatched from main." >&2
+            exit 1
+          fi
+          if [[ -z "$PREFLIGHT_RUN_ID" ]]; then
+            echo "Publish runs require preflight_run_id." >&2
+            exit 1
+          fi
+
+  publish:
+    needs: [validate_publish_request]
+    if: ${{ !inputs.preflight_only }}
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    steps:
+      - name: Validate inputs
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_TAG" == *"-beta."* && "$NPM_DIST_TAG" != "beta" ]]; then
+            echo "Prerelease tags must use npm_dist_tag=beta." >&2
+            exit 1
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify preflight run metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+        run: |
+          set -euo pipefail
+          gh run view "$PREFLIGHT_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json workflowName,headBranch,event,conclusion,url \
+            | node -e 'const fs = require("node:fs"); const run = JSON.parse(fs.readFileSync(0, "utf8")); const expected = { workflowName: "Release", headBranch: "main", event: "workflow_dispatch", conclusion: "success" }; for (const [key, value] of Object.entries(expected)) { if (run[key] !== value) { console.error(`Preflight run must have ${key}=${value}, got ${run[key] ?? "<missing>"}.`); process.exit(1); } } console.log(run.url);'
+
+      - name: Download preflight artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: notebook-tools-release-${{ inputs.tag }}
+          path: preflight-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.preflight_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate artifact provenance
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+          EXPECTED_PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          expected_version="${RELEASE_TAG#v}"
+          artifact_name="$(tr -d '\r\n' < preflight-artifact/package-name.txt)"
+          artifact_version="$(tr -d '\r\n' < preflight-artifact/package-version.txt)"
+          artifact_tag="$(tr -d '\r\n' < preflight-artifact/release-tag.txt)"
+          artifact_dist_tag="$(tr -d '\r\n' < preflight-artifact/npm-dist-tag.txt)"
+          artifact_sha="$(tr -d '\r\n' < preflight-artifact/release-sha.txt)"
+          current_sha="$(git rev-parse HEAD)"
+          if [[ "$artifact_name" != "$EXPECTED_PACKAGE_NAME" ]]; then
+            echo "Artifact package mismatch: $artifact_name" >&2
+            exit 1
+          fi
+          if [[ "$artifact_version" != "$expected_version" || "$artifact_tag" != "$RELEASE_TAG" ]]; then
+            echo "Artifact version/tag mismatch." >&2
+            exit 1
+          fi
+          if [[ "$artifact_dist_tag" != "$NPM_DIST_TAG" ]]; then
+            echo "Artifact npm dist-tag mismatch." >&2
+            exit 1
+          fi
+          if [[ "$artifact_sha" != "$current_sha" ]]; then
+            echo "Artifact commit mismatch: $artifact_sha != $current_sha" >&2
+            exit 1
+          fi
+          (cd preflight-artifact && shasum -a 256 -c *.sha256)
+
+      - name: Resolve tarball
+        id: tarball
+        run: |
+          set -euo pipefail
+          tarball="$(find preflight-artifact -maxdepth 1 -type f -name '*.tgz' -print | sort | tail -n 1)"
+          if [[ -z "$tarball" ]]; then
+            echo "No tarball found." >&2
+            exit 1
+          fi
+          echo "path=$tarball" >> "$GITHUB_OUTPUT"
+          echo "sha_path=${tarball}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "${package_name}@${package_version} is already published; skipping npm publish."
+            exit 0
+          fi
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
+          npm whoami >/dev/null
+          npm publish "${{ steps.tarball.outputs.path }}" --access public --tag "$NPM_DIST_TAG" --provenance
+
+      - name: Build release notes
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const version = process.env.RELEASE_TAG.replace(/^v/, "");
+          const lines = fs.readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
+          const start = lines.findIndex((line) => line.trim() === `## ${version}`);
+          if (start === -1) process.exit(1);
+          const body = [];
+          for (const line of lines.slice(start + 1)) {
+            if (line.trim().startsWith("## ")) break;
+            body.push(line);
+          }
+          fs.writeFileSync("release-notes.md", body.join("\n").trim() + "\n");
+          NODE
+
+      - name: Create or update draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          title="OpenClaw Notebook Tools ${RELEASE_TAG#v}"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --title "$title" \
+              --notes-file release-notes.md
+            gh release upload "$RELEASE_TAG" \
+              "${{ steps.tarball.outputs.path }}" \
+              "${{ steps.tarball.outputs.sha_path }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "${{ steps.tarball.outputs.path }}" \
+              "${{ steps.tarball.outputs.sha_path }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --title "$title" \
+              --notes-file release-notes.md
+          fi
+
+      - name: Publish to ClawHub
+        if: ${{ inputs.publish_clawhub }}
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+          CLAWHUB_OWNER: ${{ env.CLAWHUB_OWNER }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          NPM_DIST_TAG: ${{ inputs.npm_dist_tag }}
+        run: |
+          set -euo pipefail
+          npm install -g "clawhub@${CLAWHUB_VERSION}"
+          clawhub login --token "$CLAWHUB_TOKEN" --no-browser
+          package_version="${RELEASE_TAG#v}"
+          changelog="$(cat release-notes.md)"
+          release_sha="$(git rev-parse HEAD)"
+          clawhub package publish "$(pwd)" \
+            --family code-plugin \
+            --owner "$CLAWHUB_OWNER" \
+            --version "$package_version" \
+            --changelog "$changelog" \
+            --tags "$NPM_DIST_TAG" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$release_sha" \
+            --source-ref "$RELEASE_TAG" \
+            --clawscan-note "OpenClaw tool plugin for local Jupyter notebook file reads and atomic edits. It does not execute notebook code or contact external services." \
+            --json

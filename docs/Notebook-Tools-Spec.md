@@ -1,8 +1,8 @@
 # Notebook-Tools — OpenClaw Plugin Specification
 
 > Plugin: `@kittipos/openclaw-notebook-tools`
-> Version: 0.1.0
-> Target: OpenClaw ≥ 2026.2, Node ≥ 22 (ESM, TypeScript)
+> Version: 0.1.0-beta.1
+> Target: OpenClaw ≥ 2026.5.17, Node ≥ 22.19 (ESM, TypeScript)
 
 ## 1. Overview
 
@@ -648,7 +648,8 @@ Notebook files are often open in VS Code, JupyterLab, or another agent session. 
 
 ## 8. Error Model
 
-Tools never let exceptions escape. Convert in the adapter layer:
+Tools throw typed `NotebookError`s on failure. The OpenClaw SDK converts thrown
+errors into structured tool error results.
 
 ```ts
 async execute(_id, params) {
@@ -656,15 +657,15 @@ async execute(_id, params) {
     /* ... domain calls ... */
     return toolText("Edited cell ...");
   } catch (e) {
-    if (e instanceof CellNotFoundError) return toolError(e.message);
-    if (e instanceof NotebookNotFoundError) return toolError(e.message);
+    if (e instanceof NotebookError) throw e;
     api.logger.error("notebook_edit_cell unexpected", e);
-    return toolError(`Internal error: ${(e as Error).message}`);
+    throw new NotebookError(`Internal error: ${(e as Error).message}`);
   }
 }
 ```
 
-`toolError(msg)` returns `{ content: [{ type: "text", text: msg }], isError: true }`.
+Do not return `{ isError: true }`; that field is not part of the current
+`AgentToolResult` contract.
 
 ---
 
@@ -676,7 +677,7 @@ async execute(_id, params) {
 {
   "id": "notebook-tools",
   "name": "Jupyter Notebook Tools",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "Read and edit Jupyter notebooks (.ipynb)",
   "activation": { "onStartup": true },
   "capabilities": ["tools"],
@@ -801,11 +802,15 @@ Fixtures live in `tests/fixtures/`. Don't commit large notebooks — keep fixtur
 
 ```bash
 pnpm install
-pnpm build              # tsc → dist/
-pnpm test               # vitest
+pnpm typecheck          # tsc --noEmit
+pnpm test:run         # vitest single run
+pnpm plugin:check       # build + verify generated metadata is current
+pnpm plugin:validate    # OpenClaw plugin validation
+npm pack --dry-run --json
 
-# Local dev install (point OpenClaw at the repo)
-openclaw plugins install /absolute/path/to/repo
+# Local dev install from the packed package
+pnpm pack:plugin
+openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
 
 # Verify
 openclaw plugins list   # should show notebook-tools
@@ -820,7 +825,7 @@ All 9 tools are always-on after install — no `tools.allow` configuration neede
 
 A v0.1 release is ready when:
 
-- [x] All 9 tools listed by `openclaw plugins list` after install. *(install log: "notebook-tools v0.1.0 — 9 tools registered"; after dropping `{ optional: true }`, all 9 are agent-visible without `tools.allow`)*
+- [x] All 9 tools listed by `openclaw plugins list` after install. *(install log: "notebook-tools v0.1.0-beta.1 — 9 tools registered"; after dropping `{ optional: true }`, all 9 are agent-visible without `tools.allow`)*
 - [ ] `notebook_create` creates notebooks that open cleanly in JupyterLab / VS Code. *(unit test verifies JSON parses + nbformat shape; needs end-to-end open in JupyterLab)*
 - [x] `notebook_read` round-trips every fixture without modification. *(`tests/nb/save.test.ts` round-trip)*
 - [x] `notebook_search` finds code and markdown matches by stable cell id. *(`tests/nb/search.test.ts` + `tests/tools/notebook_search.test.ts`)*
@@ -829,7 +834,7 @@ A v0.1 release is ready when:
 - [x] Stale guards prevent overwriting when `mtime_ms` or `source_sha256` no longer matches. *(`tests/nb/hash.test.ts` + `tests/tools/notebook_edit_cell.test.ts` + `tests/tools/notebook_delete_cell.test.ts`)*
 - [x] Atomic save: simulated mid-write failure leaves the original file intact. *(`tests/nb/save.test.ts` "does not corrupt the original file when rename fails")*
 - [x] `notebook_validate` reports `valid=true` for all positive fixtures and useful errors for negative fixtures. *(`tests/tools/notebook_validate.test.ts`)*
-- [x] All tests pass with `pnpm test`. *(82/82 green)*
+- [x] All tests pass with `pnpm test:run`. *(83/83 green)*
 - [x] `pnpm build` produces a clean `dist/` with no TS errors under `strict: true`. *(strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes; no `any`)*
 - [ ] SKILL.md is loaded into the agent system prompt when tools are active (verify in OpenClaw logs). *(SKILL.md ships in tarball; load needs verification via gateway logs)*
 
