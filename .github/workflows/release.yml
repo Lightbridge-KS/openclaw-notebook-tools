@@ -383,10 +383,14 @@ jobs:
         run: |
           set -euo pipefail
           title="OpenClaw Notebook Tools ${RELEASE_TAG#v}"
+          release_flags=(--draft)
+          if [[ "$RELEASE_TAG" == *"-"* ]]; then
+            release_flags+=(--prerelease)
+          fi
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --draft \
+              "${release_flags[@]}" \
               --title "$title" \
               --notes-file release-notes.md
             gh release upload "$RELEASE_TAG" \
@@ -399,7 +403,7 @@ jobs:
               "${{ steps.tarball.outputs.path }}" \
               "${{ steps.tarball.outputs.sha_path }}" \
               --repo "$GITHUB_REPOSITORY" \
-              --draft \
+              "${release_flags[@]}" \
               --title "$title" \
               --notes-file release-notes.md
           fi
