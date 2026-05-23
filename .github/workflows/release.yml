@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to publish, for example v0.1.0 or v0.1.0-beta.1
+        description: Release tag to publish, for example v0.1.0 or v0.1.0-beta.2
         required: true
         type: string
       preflight_only:
@@ -38,8 +38,8 @@ env:
   NODE_VERSION: "22.19.0"
   PNPM_VERSION: "9.15.9"
   CLAWHUB_VERSION: "0.17.0"
-  PACKAGE_NAME: "@kittipos/openclaw-notebook-tools"
-  CLAWHUB_OWNER: "kittipos"
+  PACKAGE_NAME: "@lightbridge-ks/openclaw-notebook-tools"
+  CLAWHUB_OWNER: "Lightbridge-KS"
 
 jobs:
   preflight:

@@ -21,7 +21,7 @@ pnpm test:run
 pnpm plugin:check
 pnpm plugin:validate
 npm pack --dry-run --json
-clawhub package publish "$(pwd)" --owner kittipos --version 0.1.0-beta.1 --dry-run --json
+clawhub package publish "$(pwd)" --owner Lightbridge-KS --version 0.1.0-beta.2 --dry-run --json
 ```
 
 ## Release checklist
@@ -33,12 +33,12 @@ clawhub package publish "$(pwd)" --owner kittipos --version 0.1.0-beta.1 --dry-r
 5. Tag the commit:
 
    ```bash
-   git tag v0.1.0-beta.1
-   git push origin main v0.1.0-beta.1
+   git tag v0.1.0-beta.2
+   git push origin main v0.1.0-beta.2
    ```
 
 6. In GitHub Actions, run **Release** with:
-   - `tag`: `v0.1.0-beta.1`
+   - `tag`: `v0.1.0-beta.2`
    - `preflight_only`: `true`
    - `npm_dist_tag`: `latest` for stable, `beta` for prerelease
 
@@ -56,12 +56,12 @@ and optionally publishes to ClawHub.
 Use dry-run first:
 
 ```bash
-clawhub package publish "$(pwd)" --owner kittipos --version 0.1.0-beta.1 --dry-run --json
+clawhub package publish "$(pwd)" --owner Lightbridge-KS --version 0.1.0-beta.2 --dry-run --json
 ```
 
 Expected install shape after publication:
 
 ```bash
-openclaw plugins install clawhub:@kittipos/openclaw-notebook-tools
+openclaw plugins install clawhub:@lightbridge-ks/openclaw-notebook-tools
 openclaw gateway restart
 ```

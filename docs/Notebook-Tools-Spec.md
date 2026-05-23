@@ -1,7 +1,7 @@
 # Notebook-Tools — OpenClaw Plugin Specification
 
-> Plugin: `@kittipos/openclaw-notebook-tools`
-> Version: 0.1.0-beta.1
+> Plugin: `@lightbridge-ks/openclaw-notebook-tools`
+> Version: 0.1.0-beta.2
 > Target: OpenClaw ≥ 2026.5.17, Node ≥ 22.19 (ESM, TypeScript)
 
 ## 1. Overview
@@ -33,7 +33,7 @@
 ## 2. Architecture
 
 ```
-@kittipos/openclaw-notebook-tools/
+@lightbridge-ks/openclaw-notebook-tools/
 ├── package.json
 ├── openclaw.plugin.json          # Plugin manifest
 ├── tsconfig.json
@@ -677,7 +677,7 @@ Do not return `{ isError: true }`; that field is not part of the current
 {
   "id": "notebook-tools",
   "name": "Jupyter Notebook Tools",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Read and edit Jupyter notebooks (.ipynb)",
   "activation": { "onStartup": true },
   "capabilities": ["tools"],
@@ -810,7 +810,7 @@ npm pack --dry-run --json
 
 # Local dev install from the packed package
 pnpm pack:plugin
-openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
+openclaw plugins install ./lightbridge-ks-openclaw-notebook-tools-0.1.0-beta.2.tgz
 
 # Verify
 openclaw plugins list   # should show notebook-tools
@@ -825,7 +825,7 @@ All 9 tools are always-on after install — no `tools.allow` configuration neede
 
 A v0.1 release is ready when:
 
-- [x] All 9 tools listed by `openclaw plugins list` after install. *(install log: "notebook-tools v0.1.0-beta.1 — 9 tools registered"; after dropping `{ optional: true }`, all 9 are agent-visible without `tools.allow`)*
+- [x] All 9 tools listed by `openclaw plugins list` after install. *(install log: "notebook-tools v0.1.0-beta.2 — 9 tools registered"; after dropping `{ optional: true }`, all 9 are agent-visible without `tools.allow`)*
 - [ ] `notebook_create` creates notebooks that open cleanly in JupyterLab / VS Code. *(unit test verifies JSON parses + nbformat shape; needs end-to-end open in JupyterLab)*
 - [x] `notebook_read` round-trips every fixture without modification. *(`tests/nb/save.test.ts` round-trip)*
 - [x] `notebook_search` finds code and markdown matches by stable cell id. *(`tests/nb/search.test.ts` + `tests/tools/notebook_search.test.ts`)*

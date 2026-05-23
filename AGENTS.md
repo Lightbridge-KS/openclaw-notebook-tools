@@ -1,6 +1,6 @@
 # OpenClaw Notebook Tools
 
-`@kittipos/openclaw-notebook-tools` — OpenClaw plugin, 9 tools for reading/editing Jupyter notebooks. Behavioral spec: `docs/Notebook-Tools-Spec.md`. This file is the **how to implement it** doc.
+`@lightbridge-ks/openclaw-notebook-tools` — OpenClaw plugin, 9 tools for reading/editing Jupyter notebooks. Behavioral spec: `docs/Notebook-Tools-Spec.md`. This file is the **how to implement it** doc.
 
 ## Stack
 
@@ -108,7 +108,7 @@ pnpm plugin:validate
 
 # Install into OpenClaw — ALWAYS via the packed tarball, never the source dir.
 pnpm pack:plugin           # plugin:build + `npm pack` → *.tgz
-openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
+openclaw plugins install ./lightbridge-ks-openclaw-notebook-tools-0.1.0-beta.2.tgz
 openclaw plugins list      # confirm `notebook-tools` is listed
 openclaw gateway restart
 ```

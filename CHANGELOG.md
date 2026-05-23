@@ -4,6 +4,12 @@ All notable changes to OpenClaw Notebook Tools will be documented in this file.
 
 ## Unreleased
 
+## 0.1.0-beta.2
+
+- Align publisher identity for npm and ClawHub release workflows:
+  npm package scope is now `@lightbridge-ks`, ClawHub owner is
+  `Lightbridge-KS`, and documentation examples use the same identities.
+
 ## 0.1.0-beta.1
 
 - Add nine OpenClaw tools for creating, reading, listing, searching, editing,

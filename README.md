@@ -61,7 +61,7 @@ The trust boundary is implemented in the tool behavior instead:
 Install from ClawHub:
 
 ```bash
-openclaw plugins install clawhub:@kittipos/openclaw-notebook-tools
+openclaw plugins install clawhub:@lightbridge-ks/openclaw-notebook-tools
 openclaw plugins list
 openclaw gateway restart
 ```
@@ -72,9 +72,9 @@ first?" below):
 ```bash
 pnpm install
 pnpm pack:plugin                   # builds, refreshes plugin metadata, then runs `npm pack`
-                                   # → kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
+                                   # → lightbridge-ks-openclaw-notebook-tools-0.1.0-beta.2.tgz
 
-openclaw plugins install ./kittipos-openclaw-notebook-tools-0.1.0-beta.1.tgz
+openclaw plugins install ./lightbridge-ks-openclaw-notebook-tools-0.1.0-beta.2.tgz
 openclaw plugins list              # confirm `notebook-tools` is listed
 openclaw gateway restart
 ```
@@ -103,7 +103,7 @@ pnpm plugin:build # build + regenerate OpenClaw plugin metadata
 pnpm plugin:check # build + fail if generated metadata is stale
 pnpm plugin:validate
 npm pack --dry-run --json
-clawhub package publish "$(pwd)" --owner kittipos --version 0.1.0-beta.1 --dry-run --json
+clawhub package publish "$(pwd)" --owner Lightbridge-KS --version 0.1.0-beta.2 --dry-run --json
 ```
 
 The codebase follows Clean Architecture:
